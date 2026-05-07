@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Foodoor Receipt Generator</title>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Open Sans', sans-serif;
+  background: #1a1a2e;
+  min-height: 100vh;
+  padding: 20px;
+  display: flex;
+  gap: 24px;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+/* ── FORM PANEL ── */
+.form-panel {
+  width: 360px;
+  flex-shrink: 0;
+  background: #12172b;
+  border-radius: 16px;
+  padding: 24px;
+  border: 1px solid rgba(249,115,22,0.2);
+  position: sticky;
+  top: 20px;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+}
+.form-panel::-webkit-scrollbar { width: 4px; }
+.form-panel::-webkit-scrollbar-thumb { background: #F97316; border-radius: 2px; }
+
+.form-panel h2 {
+  font-family: 'Oswald', sans-serif;
+  color: #fff;
+  font-size: 1.2rem;
+  margin-bottom: 4px;
+  display: flex; align-items: center; gap: 8px;
+}
+.form-panel .sub { font-size: 0.78rem; color: #666; margin-bottom: 20px; }
+
+.form-section { margin-bottom: 18px; }
+.form-section-title {
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; color: #F97316;
+  margin-bottom: 10px; padding-bottom: 6px;
+  border-bottom: 1px solid rgba(249,115,22,0.2);
+  font-family: 'Oswald', sans-serif;
+}
+.form-group { margin-bottom: 10px; }
+.form-group label {
+  display: block; font-size: 0.72rem; font-weight: 600;
+  color: #9AA3B2; margin-bottom: 4px; letter-spacing: 0.04em;
+}
+.form-group input, .form-group select {
+  width: 100%; padding: 9px 12px;
+  background: #1e2840; border: 1.5px solid #2a3555;
+  border-radius: 8px; color: #fff; font-size: 0.85rem;
+  font-family: 'Open Sans', sans-serif; outline: none;
+  transition: border-color 0.2s;
+}
+.form-group input:focus, .form-group select:focus { border-color: #F97316; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.form-group select option { background: #1e2840; }
+
+/* Items table in form */
+.items-editor { margin-top: 8px; }
+.item-row {
+  display: grid; grid-template-columns: 1fr 60px 80px 28px;
+  gap: 6px; margin-bottom: 6px; align-items: center;
+}
+.item-row input {
+  padding: 8px 10px; background: #1e2840;
+  border: 1.5px solid #2a3555; border-radius: 7px;
+  color: #fff; font-size: 0.8rem; font-family: 'Open Sans', sans-serif; outline: none;
+}
+.item-row input:focus { border-color: #F97316; }
+.item-row .del-btn {
+  width: 28px; height: 28px; background: rgba(239,68,68,0.15);
+  border: 1px solid rgba(239,68,68,0.3); border-radius: 6px;
+  color: #EF4444; cursor: pointer; font-size: 14px;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.2s;
+}
+.item-row .del-btn:hover { background: rgba(239,68,68,0.3); }
+.add-item-btn {
+  width: 100%; padding: 8px; background: rgba(107,191,46,0.1);
+  border: 1.5px dashed rgba(107,191,46,0.4); border-radius: 8px;
+  color: #6BBF2E; font-size: 0.8rem; font-weight: 600;
+  cursor: pointer; transition: all 0.2s; font-family: 'Open Sans', sans-serif;
+}
+.add-item-btn:hover { background: rgba(107,191,46,0.2); }
+
+.payment-toggle {
+  display: flex; gap: 8px;
+}
+.pay-btn {
+  flex: 1; padding: 9px; border-radius: 8px; border: 2px solid #2a3555;
+  background: #1e2840; color: #9AA3B2; font-size: 0.78rem; font-weight: 700;
+  cursor: pointer; transition: all 0.2s; font-family: 'Open Sans', sans-serif;
+}
+.pay-btn.active { border-color: #F97316; background: rgba(249,115,22,0.1); color: #F97316; }
+
+.download-btn {
+  width: 100%; padding: 14px; margin-top: 20px;
+  background: linear-gradient(135deg, #F97316, #EA6800);
+  border: none; border-radius: 10px; color: #fff;
+  font-size: 0.95rem; font-weight: 700; cursor: pointer;
+  font-family: 'Oswald', sans-serif; letter-spacing: 0.06em;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  box-shadow: 0 6px 20px rgba(249,115,22,0.35);
+  transition: all 0.2s;
+}
+.download-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(249,115,22,0.45); }
+.download-btn:active { transform: translateY(0); }
+.download-btn.loading { opacity: 0.7; pointer-events: none; }
+
+/* ── RECEIPT PREVIEW ── */
+.receipt-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.receipt-label {
+  font-size: 0.75rem; color: #4A5568; letter-spacing: 0.1em;
+  text-transform: uppercase; font-weight: 600;
+}
+
+/* ── RECEIPT ITSELF ── */
+#receipt {
+  width: 750px;
+  background: #f0ede6;
+  font-family: 'Open Sans', sans-serif;
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+}
+
+/* HEADER */
+.r-header {
+  background: #f0ede6;
+  padding: 20px 24px 16px;
+  display: grid;
+  grid-template-columns: 140px 1fr 160px;
+  gap: 16px;
+  align-items: start;
+  border-bottom: 2px solid #2a2a2a;
+}
+.r-logo-wrap { display: flex; align-items: center; justify-content: flex-start; }
+.r-logo-wrap img { width: 120px; height: 120px; border-radius: 50%; }
+
+.r-brand { text-align: center; padding-top: 4px; }
+.r-brand-name {
+  font-family: 'Oswald', sans-serif; font-size: 3.2rem; font-weight: 700;
+  line-height: 1; letter-spacing: 2px;
+}
+.r-brand-name span.fo { color: #F97316; }
+.r-brand-name span.od { color: #4a8c1c; }
+.r-slogan {
+  font-size: 0.82rem; font-weight: 700; letter-spacing: 0.14em;
+  color: #2a2a2a; margin-top: 2px; margin-bottom: 10px;
+  text-transform: uppercase;
+}
+.r-services {
+  display: flex; gap: 6px; justify-content: center; margin-bottom: 10px;
+}
+.r-service-badge {
+  background: #2a2a2a; color: #fff; padding: 6px 10px;
+  border-radius: 6px; font-size: 0.62rem; font-weight: 700;
+  display: flex; align-items: center; gap: 5px;
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+.r-service-badge .svc-icon { font-size: 0.9rem; }
+.r-tagline {
+  font-size: 0.82rem; color: #2a2a2a; font-style: italic; font-weight: 600;
+}
+.r-tagline span { color: #4a8c1c; }
+
+.r-contact-box {
+  background: #2a2a2a; color: #fff; border-radius: 8px;
+  padding: 12px 14px;
+}
+.r-receipt-badge {
+  background: #2a2a2a; color: #fff; text-align: center;
+  padding: 8px 12px; border-radius: 6px; margin-bottom: 8px;
+  font-family: 'Oswald', sans-serif; font-size: 1.1rem; font-weight: 700; letter-spacing: 0.12em;
+}
+.r-contact-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 0.72rem; }
+.r-contact-row:last-child { margin-bottom: 0; }
+.r-contact-row .ci { font-size: 1rem; }
+.r-contact-row span { font-weight: 600; letter-spacing: 0.03em; }
+
+/* RECEIPT DETAILS BAR */
+.r-details-bar {
+  margin: 12px 16px;
+  border: 1.5px solid #c8c4bb;
+  border-radius: 8px;
+  padding: 12px 16px;
+  background: #fff;
+}
+.r-details-title {
+  background: #F97316; color: #fff; display: inline-block;
+  padding: 3px 12px; border-radius: 4px; font-size: 0.72rem;
+  font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  font-family: 'Oswald', sans-serif; margin-bottom: 10px;
+}
+.r-details-row { display: flex; gap: 32px; align-items: center; }
+.r-detail-field { display: flex; align-items: baseline; gap: 6px; }
+.r-detail-field .lbl { font-size: 0.72rem; color: #555; font-weight: 600; white-space: nowrap; }
+.r-detail-field .val {
+  font-size: 0.9rem; font-weight: 700; color: #F97316;
+  border-bottom: 1.5px solid #aaa; min-width: 80px; padding-bottom: 1px;
+}
+
+/* TWO-COL SECTION */
+.r-two-col {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 10px; margin: 0 16px 12px;
+}
+.r-box {
+  border: 1.5px solid #c8c4bb; border-radius: 8px;
+  padding: 12px 14px; background: #fff;
+}
+.r-box-title {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: #F97316; margin-bottom: 10px;
+  font-family: 'Oswald', sans-serif;
+}
+.r-box-title .bi { font-size: 1.1rem; }
+.r-field { display: flex; align-items: baseline; gap: 6px; margin-bottom: 6px; }
+.r-field .lbl { font-size: 0.7rem; color: #555; font-weight: 600; white-space: nowrap; }
+.r-field .val {
+  font-size: 0.82rem; font-weight: 700; color: #F97316;
+  border-bottom: 1.5px solid #aaa; flex: 1; padding-bottom: 1px; min-width: 60px;
+}
+
+/* CUSTOMER BOX full width */
+.r-customer-box {
+  margin: 0 16px 12px;
+  border: 1.5px solid #c8c4bb; border-radius: 8px;
+  padding: 12px 14px; background: #fff;
+}
+.r-customer-row { display: flex; gap: 24px; flex-wrap: wrap; }
+.r-customer-row .r-field { flex: 1; min-width: 180px; }
+
+/* ITEMS TABLE */
+.r-items-section { margin: 0 16px 12px; }
+.r-items-table { width: 100%; border-collapse: collapse; }
+.r-items-table thead tr {
+  background: #2a2a2a; color: #fff;
+}
+.r-items-table th {
+  padding: 10px 12px; font-size: 0.72rem; font-weight: 700;
+  letter-spacing: 0.08em; text-transform: uppercase; text-align: left;
+  font-family: 'Oswald', sans-serif;
+}
+.r-items-table th:nth-child(2), .r-items-table th:nth-child(3) { text-align: center; }
+.r-items-table tbody tr { border-bottom: 1px solid #ddd; background: #faf9f5; }
+.r-items-table tbody tr:nth-child(even) { background: #f0ede6; }
+.r-items-table td { padding: 9px 12px; font-size: 0.82rem; }
+.r-items-table td.item-name { font-weight: 600; color: #F97316; }
+.r-items-table td.item-qty { text-align: center; font-weight: 700; color: #F97316; }
+.r-items-table td.item-amt { text-align: center; font-weight: 700; color: #F97316; }
+.r-items-table .empty-row td { padding: 6px 12px; }
+.r-total-row {
+  display: flex; justify-content: flex-end;
+  margin-top: 0; border-top: 2px solid #2a2a2a;
+}
+.r-total-badge {
+  display: flex; align-items: center;
+}
+.r-total-label {
+  background: #2a2a2a; color: #fff; padding: 8px 16px;
+  font-size: 0.78rem; font-weight: 700; letter-spacing: 0.1em;
+  font-family: 'Oswald', sans-serif; text-transform: uppercase;
+}
+.r-total-val {
+  background: #4a8c1c; color: #fff; padding: 8px 20px;
+  font-size: 0.95rem; font-weight: 700; letter-spacing: 0.04em;
+  font-family: 'Oswald', sans-serif;
+}
+
+/* BOTTOM TWO COL */
+.r-bottom-two {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 10px; margin: 10px 16px 12px;
+}
+.r-charges-box {
+  border: 1.5px solid #c8c4bb; border-radius: 8px;
+  padding: 12px 14px; background: #faf9f5;
+}
+.r-charges-title {
+  background: #F97316; color: #fff; display: inline-block;
+  padding: 3px 12px; border-radius: 4px; font-size: 0.72rem;
+  font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  font-family: 'Oswald', sans-serif; margin-bottom: 12px;
+}
+.r-charge-row {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px dotted #ccc;
+  font-size: 0.8rem;
+}
+.r-charge-row:last-of-type { border-bottom: none; margin-bottom: 8px; }
+.r-charge-row .c-lbl { color: #444; font-weight: 500; }
+.r-charge-row .c-val { font-weight: 700; color: #2a2a2a; }
+.r-grand-total {
+  display: flex; align-items: center; justify-content: space-between;
+  background: #2a2a2a; color: #fff; border-radius: 6px; padding: 8px 12px;
+  margin-top: 6px;
+}
+.r-grand-total .gt-lbl { font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 0.9rem; letter-spacing: 0.08em; }
+.r-grand-total .gt-val { font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 1rem; color: #F97316; }
+
+.r-payment-box {
+  background: #2a2a2a; border-radius: 8px; padding: 14px 16px;
+}
+.r-payment-title {
+  font-family: 'Oswald', sans-serif; font-size: 0.85rem;
+  font-weight: 700; letter-spacing: 0.1em; color: #fff;
+  text-transform: uppercase; margin-bottom: 14px;
+  border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px;
+}
+.r-pay-option {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px;
+}
+.r-pay-left { display: flex; align-items: center; gap: 10px; }
+.r-pay-icon { font-size: 1.4rem; }
+.r-pay-lbl { font-size: 0.82rem; font-weight: 700; color: #fff; letter-spacing: 0.06em; text-transform: uppercase; font-family: 'Oswald', sans-serif; }
+.r-checkbox {
+  width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.4);
+  border-radius: 3px; display: flex; align-items: center; justify-content: center;
+  font-size: 12px; color: #F97316; background: rgba(255,255,255,0.05);
+  flex-shrink: 0;
+}
+.r-checkbox.checked { background: #fff; border-color: #fff; }
+.r-checkbox.checked::after { content: '✓'; color: #2a2a2a; font-weight: 700; font-size: 12px; }
+.r-pay-note { font-size: 0.7rem; color: rgba(255,255,255,0.5); margin-top: 10px; margin-bottom: 4px; }
+.r-thankyou { font-size: 0.78rem; font-weight: 700; color: #F97316; letter-spacing: 0.06em; }
+
+/* FOOTER */
+.r-footer {
+  background: #2a2a2a;
+  padding: 14px 24px;
+  display: flex; align-items: center; justify-content: space-between;
+  position: relative; overflow: hidden;
+}
+.r-footer::before {
+  content: '';
+  position: absolute; bottom: 0; left: 0;
+  width: 120px; height: 40px;
+  background: linear-gradient(135deg, #4a8c1c 0%, #F97316 100%);
+  clip-path: polygon(0 100%, 100% 100%, 60% 0, 0 0);
+}
+.r-footer::after {
+  content: '';
+  position: absolute; bottom: 0; right: 80px;
+  width: 80px; height: 30px;
+  background: #F97316;
+  clip-path: polygon(20% 0%, 100% 0%, 100% 100%, 0% 100%);
+}
+.r-footer-badges { display: flex; gap: 20px; position: relative; z-index: 1; }
+.r-badge { display: flex; align-items: center; gap: 8px; }
+.r-badge .b-icon { font-size: 1.4rem; }
+.r-badge .b-txt { font-size: 0.62rem; font-weight: 700; color: #fff; text-transform: uppercase; letter-spacing: 0.06em; line-height: 1.3; }
+.r-footer-qr { position: relative; z-index: 1; display: flex; align-items: center; gap: 12px; }
+.r-footer-qr .qr-text { font-size: 0.62rem; font-weight: 700; color: #fff; text-align: right; line-height: 1.5; text-transform: uppercase; letter-spacing: 0.04em; }
+.r-footer-qr .qr-text span { color: #F97316; }
+.r-qr-box {
+  width: 64px; height: 64px; background: #fff;
+  border-radius: 6px; display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+}
+.r-qr-box svg { width: 56px; height: 56px; }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 1200px) {
+  body { flex-direction: column; align-items: center; }
+  .form-panel { width: 100%; max-width: 750px; position: static; max-height: none; }
+  #receipt { width: 100%; max-width: 750px; }
+}
+@media (max-width: 780px) {
+  #receipt { width: 750px; transform-origin: top left; }
+  .receipt-wrap { overflow-x: auto; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── FORM PANEL ── -->
+<div class="form-panel">
+  <h2>🧾 Receipt Generator</h2>
+  <p class="sub">Fill in the fields below — receipt updates live</p>
+
+  <div class="form-section">
+    <div class="form-section-title">Receipt Info</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Receipt No.</label>
+        <input type="text" id="receiptNo" value="FD-001" oninput="update()"/>
+      </div>
+      <div class="form-group">
+        <label>Date</label>
+        <input type="date" id="receiptDate" oninput="update()"/>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>TAT</label>
+      <input type="time" id="receiptTime" value="19:00" oninput="update()"/>
+    </div>
+  </div>
+
+  <div class="form-section">
+    <div class="form-section-title">Errander Details</div>
+    <div class="form-group">
+      <label>Errander Name</label>
+      <input type="text" id="erranderName" value="Foodoor Agent" oninput="update()"/>
+    </div>
+  </div>
+
+  <div class="form-section">
+    <div class="form-section-title">Bought From</div>
+    <div class="form-group">
+      <label>Store / Shop Name</label>
+      <input type="text" id="storeName" value="Local Market" oninput="update()"/>
+    </div>
+    <div class="form-group">
+      <label>Store Contact</label>
+      <input type="text" id="storeContact" value="" placeholder="optional" oninput="update()"/>
+    </div>
+  </div>
+
+  <div class="form-section">
+    <div class="form-section-title">Customer Details</div>
+    <div class="form-group">
+      <label>Customer Name</label>
+      <input type="text" id="customerName" value="Mrs. Bunza" oninput="update()"/>
+    </div>
+    <div class="form-group">
+      <label>Phone Number</label>
+      <input type="text" id="customerPhone" value="08036583361" oninput="update()"/>
+    </div>
+    <div class="form-group">
+      <label>Delivery Address</label>
+      <input type="text" id="customerAddress" value="No. 6 Uyo Street, War College, Gwarimpa, Abuja" oninput="update()"/>
+    </div>
+  </div>
+
+  <div class="form-section">
+    <div class="form-section-title">Items Purchased</div>
+    <div class="items-editor" id="itemsEditor"></div>
+    <button class="add-item-btn" onclick="addItem()">+ Add Item</button>
+  </div>
+
+  <div class="form-section">
+    <div class="form-section-title">Charges</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Transport Fee (₦)</label>
+        <input type="number" id="transportFee" value="500" oninput="update()"/>
+      </div>
+      <div class="form-group">
+        <label>Service Charge (₦)</label>
+        <input type="number" id="serviceCharge" value="500" oninput="update()"/>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-section">
+    <div class="form-section-title">Payment Method</div>
+    <div class="payment-toggle">
+      <button class="pay-btn" id="payPaid" onclick="setPayment('paid')">💵 PAID</button>
+      <button class="pay-btn active" id="payDelivery" onclick="setPayment('delivery')">🛵 PAY ON DELIVERY</button>
+    </div>
+  </div>
+
+  <button class="download-btn" id="downloadBtn" onclick="downloadReceipt()">
+    ⬇ Download Receipt as PNG
+  </button>
+</div>
+
+<!-- ── RECEIPT PREVIEW ── -->
+<div class="receipt-wrap">
+  <div class="receipt-label">Live Preview</div>
+  <div id="receipt">
+
+    <!-- HEADER -->
+    <div class="r-header">
+      <div class="r-logo-wrap">
+        <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAHgAAAB4BAMAAADLSivhAAAAElBMVEUQGCz+/f38dxGBvSxyXDnU1dV1RiX4AAAEuklEQVR42u1ZsY7cNhB9GrK5wog2MJBUB0VImYKAUh5iOfAH+L7U/oEEKtwuoDJFogiu3ASndAuEolJIKw3JoVZnpIsXWKxudx5n5s1wZsjLTvj8F+EL+D8C19FD9MrSoZoGAMBjA21lCXUnau31X5fL/PzbZdSo+2dofgqk8qM+a0xPoQdP0IfA2r4aBFMe9AGwtq/eSya+E9CxzzIWwOmm5npKYfEURTzUPA3phNIvdjVr7GBhB70Hfph2c3l62DN7z2iBNF9ziC3LgKMhrdlXXC6f901KtQfmWUnF+uj6RJZz/qYA2y1P9P3voozn8+BhXbfo7eAK2WuSFRfoNls77sMkgwfOVccd7xJi67d64l+6xYDl549gqnUMtmzFYuGXsIBsz1Q/7FZPQlSxHFP9PgZPXHG8IFM9xeBhT7Gvetgxe1PssK3Ti6Vy/vhH3EQdV834tp5ma0SrlfESZ41MYHYj6jCKUbbFd6g9s0WuKwAVzvGi1CQJ6xl2+4DbiueoPbCJY1dFDxsXP3DZOnaZeWtCLJqagZu4p5stTiouHA0DT5HHCh0FqsmFGUoJvgyxuCovupsRJI8dCpYva8LfHxhYaG59sTPjLAAKFJOoSkV816twI2zBGwNas4KnY1NdH5oSydr5N/JdNpIUKOgaR1/6CrZI9J+9Ri+xDScVlK4Vs0FLYVaBiyUwth5hGHKBsGeN0CT5MsZybRCrHX7OxzX7RBTPjJeH7aKppJM8rBuBoCYeSspUFClNIdWd50lxe2SmzfePvN0cmvTtooHmyYQL9bfNLhKtjo4cExpa1+iBbSoKWn6zgJugjfuLunQCSLlcLO91GQeAhGKVaHQUESQNKgL4Oqc6bq04qBAAvBUt77ktocN5uvTSZpP2Z8JITIuK7Wq8A4rQarkAAsDPAKj36tC9WKHvAOAS8/DH8sd3wPQ1XBuA71bBLDba+YuFVGdioxNaiz/MHWh0Prf3e43uGuhSOM/0QLctXlUszAth/QUAKP9qAIC/8z/5oZ0dmNS3+OYTALxwYXoWy18uWUCMP5/QRh7drLsKL1pGNtdc+KeY9EAQ7qp8Po307gbYGFTVSjCtmVqgINfvQsdczZ3sAwdbBcD9CoDKPfQvyM7nFpk/6f8E9P187kuhq6oC2okPZNcj8HJ0LoMTr9/wx3Ye3k8+Yev07bpE1zU4QwHtGLNtszUbU4yPOMNgzNkmXAP79rohUqFu10jnIVh74aeSp5qq/FKlQ7DNWIWngk+AyqDipSqzcd3Olxwt1h+qeQOa+W18QR+cAXCgEg6F65bjdgUonM8AoH6s0Po1i/zC0s/vfjXTACPQKrSYohFrA3/IAThvGhjPGzljvhD+UpqGZsqsXwhaw/I6oMuPai5PBzpuUgI4Y9+yrjgBZoxlwmXz4XqyKXlaVgnFfjK+zreqfT/nxzjTdO02pzp5K6Wtd1taLSOsMtdBNntpk5ot8mgrzRG7Gm0/+/YRj83+LXN2SWOzT7cGmvR9d3zVTDiKFq6pCQfR0hW3AK5PIlaYAOSb9Yjzx0a0RgJr69/LJ27l5VppUZ9O62Z8fZJMTpvtX53UDZ4JBvDGNnhjm52s+fL/qv8F+F9eC18VYFAX0wAAAABJRU5ErkJggg==" alt="Foodoor"/>
+      </div>
+      <div class="r-brand">
+        <div class="r-brand-name"><span class="fo">FOO</span><span class="od">DOOR</span></div>
+        <div class="r-slogan">Foot at Your Door.</div>
+        <div class="r-services">
+          <div class="r-service-badge"><span class="svc-icon">🔥</span><div><div>GAS</div><div>REFILL</div></div></div>
+          <div class="r-service-badge"><span class="svc-icon">🛒</span><div><div>GROCERY</div><div>SHOPPING</div></div></div>
+          <div class="r-service-badge"><span class="svc-icon">📦</span><div><div>PICKUP &</div><div>DISPATCH</div></div></div>
+        </div>
+        <div class="r-tagline">We run your errands while <span>you relax.</span></div>
+      </div>
+      <div class="r-contact-box">
+        <div class="r-receipt-badge">RECEIPT</div>
+        <div class="r-contact-row"><span class="ci">📍</span><span>SERVING<br/>GWARIMPA, ABUJA</span></div>
+        <div class="r-contact-row"><span class="ci">💬</span><span>08022954809</span></div>
+        <div class="r-contact-row"><span class="ci">📸</span><span>@foodoor_ng</span></div>
+      </div>
+    </div>
+
+    <!-- RECEIPT DETAILS -->
+    <div class="r-details-bar">
+      <div class="r-details-title">Receipt Details</div>
+      <div class="r-details-row">
+        <div class="r-detail-field">
+          <span class="lbl">Receipt No.:</span>
+          <span class="val" id="r-receiptNo">FD-001</span>
+        </div>
+        <div class="r-detail-field">
+          <span class="lbl">Date:</span>
+          <span class="val" id="r-date">06/05/2026</span>
+        </div>
+        <div class="r-detail-field">
+          <span class="lbl">TAT:</span>
+          <span class="val" id="r-time">7:00 PM</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ERRANDER + BOUGHT FROM -->
+    <div class="r-two-col">
+      <div class="r-box">
+        <div class="r-box-title"><span class="bi">👤</span> Errander Details</div>
+        <div class="r-field">
+          <span class="lbl">Errander Name:</span>
+          <span class="val" id="r-erranderName">Foodoor Agent</span>
+        </div>
+      </div>
+      <div class="r-box">
+        <div class="r-box-title"><span class="bi">🏪</span> Bought From</div>
+        <div class="r-field">
+          <span class="lbl">Store / Shop Name:</span>
+          <span class="val" id="r-storeName">Local Market</span>
+        </div>
+        <div class="r-field">
+          <span class="lbl">Store Contact:</span>
+          <span class="val" id="r-storeContact">—</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- CUSTOMER DETAILS -->
+    <div class="r-customer-box">
+      <div class="r-box-title"><span class="bi">👤</span> Customer Details</div>
+      <div class="r-customer-row">
+        <div class="r-field">
+          <span class="lbl">Customer Name:</span>
+          <span class="val" id="r-customerName">Mrs. Bunza</span>
+        </div>
+        <div class="r-field">
+          <span class="lbl">Phone Number:</span>
+          <span class="val" id="r-customerPhone">08036583361</span>
+        </div>
+      </div>
+      <div class="r-field" style="margin-top:6px;">
+        <span class="lbl">Delivery Address:</span>
+        <span class="val" id="r-customerAddress" style="color:#F97316;">No. 6 Uyo Street, War College, Gwarimpa, Abuja</span>
+      </div>
+    </div>
+
+    <!-- ITEMS TABLE -->
+    <div class="r-items-section">
+      <table class="r-items-table">
+        <thead>
+          <tr>
+            <th>Items Purchased</th>
+            <th>Quantity</th>
+            <th>Amount (₦)</th>
+          </tr>
+        </thead>
+        <tbody id="r-itemsBody">
+          <tr><td class="item-name">Fresh Ginger</td><td class="item-qty">1</td><td class="item-amt">2,000</td></tr>
+          <tr><td class="item-name">Fresh Tomatoes</td><td class="item-qty">1</td><td class="item-amt">2,000</td></tr>
+          <tr class="empty-row"><td>&nbsp;</td><td></td><td></td></tr>
+          <tr class="empty-row"><td>&nbsp;</td><td></td><td></td></tr>
+          <tr class="empty-row"><td>&nbsp;</td><td></td><td></td></tr>
+        </tbody>
+      </table>
+      <div class="r-total-row">
+        <div class="r-total-badge">
+          <div class="r-total-label">Total Items Cost</div>
+          <div class="r-total-val" id="r-itemsTotal">₦4,000</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CHARGES + PAYMENT -->
+    <div class="r-bottom-two">
+      <div class="r-charges-box">
+        <div class="r-charges-title">Charges Breakdown</div>
+        <div class="r-charge-row"><span class="c-lbl">Cost of Items</span><span class="c-val" id="r-costItems">₦4,000</span></div>
+        <div class="r-charge-row"><span class="c-lbl">Transport Fee</span><span class="c-val" id="r-transport">₦500</span></div>
+        <div class="r-charge-row"><span class="c-lbl">Service Charge</span><span class="c-val" id="r-service">₦500</span></div>
+        <div class="r-grand-total">
+          <span class="gt-lbl">TOTAL</span>
+          <span class="gt-val" id="r-total">₦5,000</span>
+        </div>
+      </div>
+      <div class="r-payment-box">
+        <div class="r-payment-title">Payment</div>
+        <div class="r-pay-option">
+          <div class="r-pay-left">
+            <span class="r-pay-icon">💵</span>
+            <span class="r-pay-lbl">Paid</span>
+          </div>
+          <div class="r-checkbox" id="r-checkPaid"></div>
+        </div>
+        <div class="r-pay-option">
+          <div class="r-pay-left">
+            <span class="r-pay-icon">🛵</span>
+            <span class="r-pay-lbl">Pay on Delivery</span>
+          </div>
+          <div class="r-checkbox checked" id="r-checkDelivery"></div>
+        </div>
+        <div class="r-pay-note">Kindly verify all items before payment.</div>
+        <div class="r-thankyou">THANK YOU FOR USING FOODOOR!</div>
+      </div>
+    </div>
+
+    <!-- FOOTER -->
+    <div class="r-footer">
+      <div class="r-footer-badges">
+        <div class="r-badge"><span class="b-icon">🛡️</span><div class="b-txt">RELIABLE<br/>SERVICE</div></div>
+        <div class="r-badge"><span class="b-icon">⏱️</span><div class="b-txt">FAST &<br/>TIMELY</div></div>
+        <div class="r-badge"><span class="b-icon">👍</span><div class="b-txt">CUSTOMER<br/>SATISFACTION</div></div>
+      </div>
+      <div class="r-footer-qr">
+        <div class="qr-text">SCAN <span>TO</span> CHAT<br/>WITH US ON WHATSAPP</div>
+        <div class="r-qr-box">
+          <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+            <rect width="100" height="100" fill="white"/>
+            <!-- QR pattern - simplified visual representation -->
+            <rect x="5" y="5" width="35" height="35" fill="none" stroke="#000" stroke-width="4"/>
+            <rect x="13" y="13" width="19" height="19" fill="#000"/>
+            <rect x="60" y="5" width="35" height="35" fill="none" stroke="#000" stroke-width="4"/>
+            <rect x="68" y="13" width="19" height="19" fill="#000"/>
+            <rect x="5" y="60" width="35" height="35" fill="none" stroke="#000" stroke-width="4"/>
+            <rect x="13" y="68" width="19" height="19" fill="#000"/>
+            <!-- dots -->
+            <rect x="46" y="5" width="8" height="8" fill="#000"/>
+            <rect x="46" y="19" width="8" height="8" fill="#000"/>
+            <rect x="46" y="33" width="8" height="8" fill="#000"/>
+            <rect x="5" y="46" width="8" height="8" fill="#000"/>
+            <rect x="19" y="46" width="8" height="8" fill="#000"/>
+            <rect x="33" y="46" width="8" height="8" fill="#000"/>
+            <rect x="60" y="46" width="8" height="8" fill="#000"/>
+            <rect x="74" y="46" width="8" height="8" fill="#000"/>
+            <rect x="88" y="46" width="8" height="8" fill="#000"/>
+            <rect x="46" y="60" width="8" height="8" fill="#000"/>
+            <rect x="60" y="60" width="8" height="8" fill="#000"/>
+            <rect x="74" y="74" width="8" height="8" fill="#000"/>
+            <rect x="88" y="74" width="8" height="8" fill="#000"/>
+            <rect x="60" y="88" width="8" height="8" fill="#000"/>
+            <rect x="88" y="88" width="8" height="8" fill="#000"/>
+            <rect x="46" y="74" width="8" height="8" fill="#000"/>
+            <rect x="46" y="88" width="8" height="8" fill="#000"/>
+            <rect x="74" y="60" width="8" height="8" fill="#000"/>
+            <rect x="88" y="60" width="8" height="8" fill="#000"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end receipt -->
+</div>
+
+<script>
+// ── State ─────────────────────────────────────
+let items = [
+  { name: 'Fresh Ginger', qty: 1, amount: 2000 },
+  { name: 'Fresh Tomatoes', qty: 1, amount: 2000 },
+];
+let paymentMethod = 'delivery';
+
+// ── Init ──────────────────────────────────────
+window.onload = () => {
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth()+1).padStart(2,'0');
+  const dd = String(today.getDate()).padStart(2,'0');
+  document.getElementById('receiptDate').value = `${yyyy}-${mm}-${dd}`;
+  renderItemsEditor();
+  update();
+};
+
+// ── Render items in form ──────────────────────
+function renderItemsEditor() {
+  const editor = document.getElementById('itemsEditor');
+  editor.innerHTML = items.map((item, i) => `
+    <div class="item-row">
+      <input type="text" placeholder="Item name" value="${item.name}" oninput="updateItem(${i},'name',this.value)"/>
+      <input type="number" placeholder="Qty" value="${item.qty}" oninput="updateItem(${i},'qty',this.value)"/>
+      <input type="number" placeholder="Amount" value="${item.amount}" oninput="updateItem(${i},'amount',this.value)"/>
+      <button class="del-btn" onclick="removeItem(${i})">✕</button>
+    </div>
+  `).join('');
+}
+
+function addItem() {
+  items.push({ name: '', qty: 1, amount: 0 });
+  renderItemsEditor();
+  update();
+}
+
+function removeItem(i) {
+  items.splice(i, 1);
+  renderItemsEditor();
+  update();
+}
+
+function updateItem(i, field, val) {
+  items[i][field] = field === 'name' ? val : (parseFloat(val) || 0);
+  update();
+}
+
+// ── Set payment method ─────────────────────────
+function setPayment(method) {
+  paymentMethod = method;
+  document.getElementById('payPaid').classList.toggle('active', method === 'paid');
+  document.getElementById('payDelivery').classList.toggle('active', method === 'delivery');
+  update();
+}
+
+// ── Format number ─────────────────────────────
+function fmt(n) {
+  return Number(n).toLocaleString('en-NG');
+}
+
+// ── Format time ───────────────────────────────
+function fmtTime(t) {
+  if (!t) return '';
+  const [h, m] = t.split(':');
+  const hour = parseInt(h);
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  const h12 = hour % 12 || 12;
+  return `${h12}:${m} ${ampm}`;
+}
+
+// ── Format date ───────────────────────────────
+function fmtDate(d) {
+  if (!d) return '';
+  const [y, m, day] = d.split('-');
+  return `${day}/${m}/${y}`;
+}
+
+// ── Main update ───────────────────────────────
+function update() {
+  // Receipt details
+  document.getElementById('r-receiptNo').textContent = document.getElementById('receiptNo').value || 'FD-001';
+  document.getElementById('r-date').textContent = fmtDate(document.getElementById('receiptDate').value);
+  document.getElementById('r-time').textContent = fmtTime(document.getElementById('receiptTime').value);
+
+  // Errander
+  document.getElementById('r-erranderName').textContent = document.getElementById('erranderName').value || '—';
+
+  // Store
+  document.getElementById('r-storeName').textContent = document.getElementById('storeName').value || '—';
+  document.getElementById('r-storeContact').textContent = document.getElementById('storeContact').value || '—';
+
+  // Customer
+  document.getElementById('r-customerName').textContent = document.getElementById('customerName').value || '—';
+  document.getElementById('r-customerPhone').textContent = document.getElementById('customerPhone').value || '—';
+  document.getElementById('r-customerAddress').textContent = document.getElementById('customerAddress').value || '—';
+
+  // Items table
+  const itemsTotal = items.reduce((sum, it) => sum + (parseFloat(it.amount) || 0), 0);
+  const tbody = document.getElementById('r-itemsBody');
+  const minRows = 5;
+  let rows = items.map(it => `
+    <tr>
+      <td class="item-name">${it.name || ''}</td>
+      <td class="item-qty">${it.qty || ''}</td>
+      <td class="item-amt">${it.amount ? fmt(it.amount) : ''}</td>
+    </tr>
+  `).join('');
+  // Pad with empty rows
+  const emptyCount = Math.max(0, minRows - items.length);
+  for (let i = 0; i < emptyCount; i++) {
+    rows += `<tr class="empty-row"><td>&nbsp;</td><td></td><td></td></tr>`;
+  }
+  tbody.innerHTML = rows;
+  document.getElementById('r-itemsTotal').textContent = `₦${fmt(itemsTotal)}`;
+
+  // Charges
+  const transport = parseFloat(document.getElementById('transportFee').value) || 0;
+  const service = parseFloat(document.getElementById('serviceCharge').value) || 0;
+  const grandTotal = itemsTotal + transport + service;
+
+  document.getElementById('r-costItems').textContent = `₦${fmt(itemsTotal)}`;
+  document.getElementById('r-transport').textContent = `₦${fmt(transport)}`;
+  document.getElementById('r-service').textContent = `₦${fmt(service)}`;
+  document.getElementById('r-total').textContent = `₦${fmt(grandTotal)}`;
+
+  // Payment checkboxes
+  const checkPaid = document.getElementById('r-checkPaid');
+  const checkDelivery = document.getElementById('r-checkDelivery');
+  if (paymentMethod === 'paid') {
+    checkPaid.className = 'r-checkbox checked';
+    checkDelivery.className = 'r-checkbox';
+  } else {
+    checkPaid.className = 'r-checkbox';
+    checkDelivery.className = 'r-checkbox checked';
+  }
+}
+
+// ── Download ──────────────────────────────────
+async function downloadReceipt() {
+  const btn = document.getElementById('downloadBtn');
+  btn.classList.add('loading');
+  btn.textContent = '⏳ Generating...';
+
+  try {
+    const receipt = document.getElementById('receipt');
+    const canvas = await html2canvas(receipt, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#f0ede6',
+      logging: false,
+    });
+
+    const link = document.createElement('a');
+    const receiptNo = document.getElementById('receiptNo').value || 'receipt';
+    link.download = `Foodoor-Receipt-${receiptNo}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  } catch(e) {
+    alert('Download failed. Please try again.');
+    console.error(e);
+  }
+
+  btn.classList.remove('loading');
+  btn.innerHTML = '⬇ Download Receipt as PNG';
+}
+</script>
+</body>
+</html>
